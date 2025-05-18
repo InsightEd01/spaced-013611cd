@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -42,11 +43,13 @@ const ParentDashboard: React.FC = () => {
 
       const { data: studentsData, error } = await supabase
         .from('students')
-        .select(\`
+        .select(`
           id,
-          name,
-          classes ( name )
-        \`)
+          first_name,
+          last_name,
+          class_id,
+          classes:class_id (class_name)
+        `)
         .in('id', authState.studentIds);
 
       if (error) throw error;
@@ -57,11 +60,11 @@ const ParentDashboard: React.FC = () => {
           // Fetch subjects and grades
           const { data: subjects } = await supabase
             .from('student_subjects')
-            .select(\`
-              subjects (name),
+            .select(`
+              subjects:subject_id (subject_name),
               grade,
               progress
-            \`)
+            `)
             .eq('student_id', student.id);
 
           // Fetch upcoming events
@@ -74,11 +77,11 @@ const ParentDashboard: React.FC = () => {
 
           return {
             id: student.id,
-            name: student.name,
-            class_name: student.classes?.name || '',
+            name: `${student.first_name} ${student.last_name}`,
+            class_name: student.classes?.class_name || '',
             attendance: 95, // This would come from an attendance tracking system
             subjects: subjects?.map(s => ({
-              name: s.subjects.name,
+              name: s.subjects.subject_name,
               grade: s.grade || 'N/A',
               progress: s.progress || 0
             })) || [],
