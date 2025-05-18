@@ -1,6 +1,5 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase, getRole } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -15,6 +14,7 @@ interface AuthState {
 
 interface AuthContextType {
   authState: AuthState;
+  loading: boolean; // Added this property to fix ProtectedRoute component
   signup: (params: { email: string; password: string; studentNumber?: string }) => Promise<void>;
   login: (params: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
@@ -200,6 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         authState,
+        loading: authState.loading, // Expose loading state directly
         signup,
         login,
         logout,
