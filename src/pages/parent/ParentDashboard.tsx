@@ -1,178 +1,232 @@
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import ParentLayout from '@/components/layouts/ParentLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarCheck, FileText, Bell, MessageSquare } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calendar } from '@/components/ui/calendar';
+import { BookOpen, GraduationCap, Trophy, Bell } from 'lucide-react';
+
+interface StudentInfo {
+  id: string;
+  name: string;
+  class_name: string;
+  attendance: number;
+  subjects: Array<{
+    name: string;
+    grade: string;
+    progress: number;
+  }>;
+  upcoming_events: Array<{
+    id: string;
+    title: string;
+    date: string;
+    type: string;
+  }>;
+}
 
 const ParentDashboard: React.FC = () => {
-  const studentInfo = {
-    name: 'John Doe',
-    grade: '9th Grade',
-    className: 'Section A',
-    studentId: '1234567890',
+  const { authState } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [students, setStudents] = useState<StudentInfo[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+
+  useEffect(() => {
+    fetchStudentInfo();
+  }, [authState.studentIds]);
+
+  const fetchStudentInfo = async () => {
+    try {
+      if (!authState.studentIds?.length) return;
+
+      const { data: studentsData, error } = await supabase
+        .from('students')
+        .select(\`
+          id,
+          name,
+          classes ( name )
+        \`)
+        .in('id', authState.studentIds);
+
+      if (error) throw error;
+
+      // Transform and enrich the data
+      const enrichedData: StudentInfo[] = await Promise.all(
+        (studentsData || []).map(async (student) => {
+          // Fetch subjects and grades
+          const { data: subjects } = await supabase
+            .from('student_subjects')
+            .select(\`
+              subjects (name),
+              grade,
+              progress
+            \`)
+            .eq('student_id', student.id);
+
+          // Fetch upcoming events
+          const { data: events } = await supabase
+            .from('assessments')
+            .select('*')
+            .gte('date', new Date().toISOString())
+            .order('date')
+            .limit(5);
+
+          return {
+            id: student.id,
+            name: student.name,
+            class_name: student.classes?.name || '',
+            attendance: 95, // This would come from an attendance tracking system
+            subjects: subjects?.map(s => ({
+              name: s.subjects.name,
+              grade: s.grade || 'N/A',
+              progress: s.progress || 0
+            })) || [],
+            upcoming_events: events?.map(e => ({
+              id: e.id,
+              title: e.assessment_name,
+              date: e.date,
+              type: e.assessment_type
+            })) || []
+          };
+        })
+      );
+
+      setStudents(enrichedData);
+    } catch (error) {
+      console.error('Error fetching student info:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const attendanceSummary = {
-    present: 18,
-    absent: 1,
-    late: 1,
-    total: 20,
-    presentPercentage: '90%',
-  };
-
-  const recentAssessments = [
-    {
-      id: 1,
-      subject: 'Mathematics',
-      title: 'Mid-term Exam',
-      score: '85/100',
-      date: '2025-05-10',
-    },
-    {
-      id: 2,
-      subject: 'Science',
-      title: 'Laboratory Assessment',
-      score: '42/50',
-      date: '2025-05-08',
-    },
-    {
-      id: 3,
-      subject: 'English',
-      title: 'Essay Writing',
-      score: '18/20',
-      date: '2025-05-05',
-    },
-  ];
-
-  const announcements = [
-    {
-      id: 1,
-      title: 'School Closure - Weather Advisory',
-      date: '2025-05-15',
-      content: 'Due to the severe weather forecast, school will be closed tomorrow.',
-    },
-    {
-      id: 2,
-      title: 'Parent-Teacher Conference',
-      date: '2025-05-10',
-      content: 'Annual parent-teacher conferences will be held next week. Please check the schedule.',
-    },
-  ];
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
 
   return (
     <ParentLayout title="Parent Dashboard">
       <div className="space-y-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-              <div>
-                <h3 className="text-2xl font-bold">{studentInfo.name}</h3>
-                <p className="text-gray-600">
-                  {studentInfo.grade} | {studentInfo.className}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Student ID: {studentInfo.studentId}
-                </p>
-              </div>
-              <div className="mt-4 md:mt-0 flex items-center space-x-2">
-                <span className="bg-green-100 text-green-800 text-xs font-medium py-1 px-2 rounded">
-                  Active
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xl">Attendance Summary</CardTitle>
-              <CalendarCheck className="h-5 w-5 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-3xl font-bold text-edu-blue">{attendanceSummary.presentPercentage}</h4>
-                <p className="text-sm text-gray-600">Last 30 days</p>
-              </div>
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="bg-green-50 p-3 rounded-md">
-                  <p className="text-2xl font-bold text-green-700">{attendanceSummary.present}</p>
-                  <p className="text-xs text-gray-600">Present</p>
-                </div>
-                <div className="bg-red-50 p-3 rounded-md">
-                  <p className="text-2xl font-bold text-red-700">{attendanceSummary.absent}</p>
-                  <p className="text-xs text-gray-600">Absent</p>
-                </div>
-                <div className="bg-yellow-50 p-3 rounded-md">
-                  <p className="text-2xl font-bold text-yellow-700">{attendanceSummary.late}</p>
-                  <p className="text-xs text-gray-600">Late</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xl">Recent Assessments</CardTitle>
-              <FileText className="h-5 w-5 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {recentAssessments.map((assessment) => (
-                  <div key={assessment.id} className="flex justify-between items-center border-b pb-2 last:border-0">
-                    <div>
-                      <p className="font-medium">{assessment.subject}</p>
-                      <p className="text-sm text-gray-600">{assessment.title}</p>
-                      <p className="text-xs text-gray-500">{assessment.date}</p>
+        <h1 className="text-3xl font-bold">Parent Dashboard</h1>
+
+        <Tabs defaultValue={students[0]?.id} className="space-y-6">
+          <TabsList>
+            {students.map(student => (
+              <TabsTrigger key={student.id} value={student.id}>
+                {student.name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          {students.map(student => (
+            <TabsContent key={student.id} value={student.id} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Class</CardTitle>
+                    <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{student.class_name}</div>
+                    <p className="text-xs text-muted-foreground">Current class</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Attendance</CardTitle>
+                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{student.attendance}%</div>
+                    <Progress value={student.attendance} className="mt-2" />
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Subjects</CardTitle>
+                    <Trophy className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{student.subjects.length}</div>
+                    <p className="text-xs text-muted-foreground">Enrolled subjects</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Events</CardTitle>
+                    <Bell className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {student.upcoming_events.length}
                     </div>
-                    <div className="text-lg font-bold text-edu-blue">
-                      {assessment.score}
-                    </div>
-                  </div>
-                ))}
+                    <p className="text-xs text-muted-foreground">Upcoming events</p>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xl">Announcements</CardTitle>
-            <Bell className="h-5 w-5 text-gray-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {announcements.map((announcement) => (
-                <div key={announcement.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                  <div className="flex justify-between items-center mb-1">
-                    <h4 className="font-semibold">{announcement.title}</h4>
-                    <span className="text-xs text-gray-500">{announcement.date}</span>
-                  </div>
-                  <p className="text-sm text-gray-600">{announcement.content}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xl">Submit Feedback</CardTitle>
-            <MessageSquare className="h-5 w-5 text-gray-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <textarea 
-                className="w-full border border-gray-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-edu-blue focus:border-transparent"
-                placeholder="Write your feedback, suggestions, or questions here..."
-                rows={4}
-              />
-              <button className="bg-edu-blue text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
-                Submit Feedback
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Subject Progress</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {student.subjects.map(subject => (
+                        <div key={subject.name} className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium">{subject.name}</span>
+                            <span className="text-sm text-muted-foreground">
+                              Grade: {subject.grade}
+                            </span>
+                          </div>
+                          <Progress value={subject.progress} />
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Calendar</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
+                      className="rounded-md border shadow"
+                    />
+                    <div className="mt-4">
+                      <h4 className="text-sm font-semibold mb-2">Upcoming Events</h4>
+                      <div className="space-y-2">
+                        {student.upcoming_events.map(event => (
+                          <div
+                            key={event.id}
+                            className="flex items-center justify-between text-sm"
+                          >
+                            <span>{event.title}</span>
+                            <span className="text-muted-foreground">
+                              {new Date(event.date).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          ))}
+        </Tabs>
       </div>
     </ParentLayout>
   );

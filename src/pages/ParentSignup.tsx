@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -99,99 +98,95 @@ const ParentSignup: React.FC = () => {
           
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="your@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  autoComplete="email"
+                  className="mt-1"
+                  placeholder="your.email@example.com"
                 />
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm Password</Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                />
-                {password && confirmPassword && password !== confirmPassword && (
-                  <p className="text-edu-red text-sm">Passwords do not match</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="student-number">Student ID Number</Label>
+
+              <div>
+                <Label htmlFor="studentNumber">Student Number</Label>
                 <div className="relative">
                   <Input
-                    id="student-number"
+                    id="studentNumber"
                     type="text"
-                    placeholder="10-digit student number"
                     value={studentNumber}
                     onChange={(e) => setStudentNumber(e.target.value)}
                     onBlur={handleStudentNumberBlur}
                     required
+                    className="mt-1"
+                    placeholder="10-digit number"
+                    pattern="[0-9]{10}"
                     maxLength={10}
-                    className="pr-10"
                   />
                   {isStudentNumberValid !== null && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
                       {isStudentNumberValid ? (
                         <CheckCircle2 className="h-5 w-5 text-green-500" />
                       ) : (
-                        <AlertCircle className="h-5 w-5 text-edu-red" />
+                        <AlertCircle className="h-5 w-5 text-red-500" />
                       )}
                     </div>
                   )}
                 </div>
                 {isStudentNumberValid === false && (
-                  <p className="text-edu-red text-sm">Student ID not found</p>
+                  <p className="text-sm text-red-500 mt-1">
+                    Invalid student number. Please check and try again.
+                  </p>
                 )}
-                <p className="text-xs text-gray-500">
-                  Enter the 10-digit student ID provided by your child's school
-                </p>
               </div>
-              
-              {authState.error && (
-                <div className="text-edu-red text-sm pt-1">
-                  {authState.error}
-                </div>
-              )}
-              
+
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="mt-1"
+                  minLength={8}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="mt-1"
+                  minLength={8}
+                />
+                {password !== confirmPassword && confirmPassword !== "" && (
+                  <p className="text-sm text-red-500 mt-1">
+                    Passwords do not match
+                  </p>
+                )}
+              </div>
+
               <Button
                 type="submit"
-                className="w-full bg-edu-blue hover:bg-blue-700"
-                disabled={isSubmitting || (isStudentNumberValid === false)}
+                className="w-full"
+                disabled={isSubmitting || !isStudentNumberValid || password !== confirmPassword}
               >
-                {isSubmitting ? 'Signing up...' : 'Sign Up'}
+                {isSubmitting ? "Creating account..." : "Sign Up"}
               </Button>
             </form>
           </CardContent>
           
           <CardFooter className="flex justify-center">
             <p className="text-sm text-gray-600">
-              Already have an account?{' '}
+              Already have an account?{" "}
               <Link to="/login" className="text-edu-blue hover:underline">
                 Sign in
               </Link>

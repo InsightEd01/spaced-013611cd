@@ -1,135 +1,226 @@
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, BookOpen, Bell, CalendarCheck } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import {
+  Users,
+  GraduationCap,
+  BookOpen,
+  Activity,
+  UserPlus,
+  School,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { DataTable } from '@/components/ui/data-table';
+import { columns } from './columns';
 
-const AdminDashboard: React.FC = () => {
-  const stats = [
-    {
-      title: 'Total Teachers',
-      value: '24',
-      icon: Users,
-      color: 'bg-blue-100 text-edu-blue',
-    },
-    {
-      title: 'Total Students',
-      value: '328',
-      icon: Users,
-      color: 'bg-green-100 text-green-700',
-    },
-    {
-      title: 'Total Classes',
-      value: '16',
-      icon: BookOpen,
-      color: 'bg-purple-100 text-purple-700',
-    },
-    {
-      title: 'Attendance Rate',
-      value: '94%',
-      icon: CalendarCheck,
-      color: 'bg-amber-100 text-amber-700',
-    },
-  ];
+interface SchoolStats {
+  totalStudents: number;
+  totalTeachers: number;
+  totalClasses: number;
+  attendanceRate: number;
+  recentEnrollments: Array<{
+    id: string;
+    name: string;
+    class_name: string;
+    date: string;
+  }>;
+  topClasses: Array<{
+    id: string;
+    name: string;
+    performance: number;
+  }>;
+}
 
-  const recentAnnouncements = [
-    {
-      id: 1,
-      title: 'School Closure - Weather Advisory',
-      date: '2025-05-15',
-      content: 'Due to the severe weather forecast, school will be closed tomorrow.',
-    },
-    {
-      id: 2,
-      title: 'Parent-Teacher Conference',
-      date: '2025-05-10',
-      content: 'Annual parent-teacher conferences will be held next week. Please check the schedule.',
-    },
-    {
-      id: 3,
-      title: 'Sports Day Announcement',
-      date: '2025-05-05',
-      content: 'Annual sports day will be held on May 20th. All students are expected to participate.',
-    },
-  ];
+const AdminDashboard = () => {
+  const { authState } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<SchoolStats | null>(null);
+
+  useEffect(() => {
+    fetchSchoolStats();
+  }, []);
+
+  const fetchSchoolStats = async () => {
+    try {
+      // Get total students
+      const { count: studentCount } = await supabase
+        .from('students')
+        .select('*', { count: 'exact' })
+        .eq('school_id', authState.schoolId);
+
+      // Get total teachers
+      const { count: teacherCount } = await supabase
+        .from('teachers')
+        .select('*', { count: 'exact' })
+        .eq('school_id', authState.schoolId);
+
+      // Get total classes
+      const { count: classCount } = await supabase
+        .from('classes')
+        .select('*', { count: 'exact' })
+        .eq('school_id', authState.schoolId);
+
+      // Get recent enrollments
+      const { data: recentEnrollments } = await supabase
+        .from('students')
+        .select(`
+          id,
+          name,
+          classes (class_name),
+          created_at
+        `)
+        .eq('school_id', authState.schoolId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      // Mock data for demonstration
+      const mockTopClasses = [
+        { id: '1', name: 'Class 10A', performance: 92 },
+        { id: '2', name: 'Class 9B', performance: 88 },
+        { id: '3', name: 'Class 11C', performance: 85 },
+      ];
+
+      setStats({
+        totalStudents: studentCount || 0,
+        totalTeachers: teacherCount || 0,
+        totalClasses: classCount || 0,
+        attendanceRate: 92, // This would be calculated from actual attendance records
+        recentEnrollments: recentEnrollments?.map(e => ({
+          id: e.id,
+          name: e.name,
+          class_name: e.classes?.class_name || '',
+          date: e.created_at,
+        })) || [],
+        topClasses: mockTopClasses,
+      });
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching school stats:', error);
+      setLoading(false);
+    }
+  };
+
+  if (loading || !stats) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
 
   return (
-    <AdminLayout title="Admin Dashboard">
+    <AdminLayout>
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
-            <Card key={index}>
-              <CardContent className="p-6 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">{stat.title}</p>
-                  <h3 className="text-3xl font-bold mt-1">{stat.value}</h3>
-                </div>
-                <div className={`p-3 rounded-full ${stat.color}`}>
-                  <stat.icon className="h-6 w-6" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">School Dashboard</h1>
+          <div className="flex gap-3">
+            <Button>
+              <UserPlus className="h-4 w-4 mr-2" /> Add Teacher
+            </Button>
+            <Button>
+              <School className="h-4 w-4 mr-2" /> Add Class
+            </Button>
+          </div>
         </div>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xl">Recent Announcements</CardTitle>
-            <Bell className="h-5 w-5 text-gray-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentAnnouncements.map((announcement) => (
-                <div key={announcement.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                  <div className="flex justify-between items-center mb-1">
-                    <h4 className="font-semibold">{announcement.title}</h4>
-                    <span className="text-xs text-gray-500">{announcement.date}</span>
-                  </div>
-                  <p className="text-sm text-gray-600">{announcement.content}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="md:col-span-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xl">Recent Activities</CardTitle>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalStudents}</div>
+              <p className="text-xs text-muted-foreground">
+                Across all classes
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Teachers</CardTitle>
+              <GraduationCap className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalTeachers}</div>
+              <p className="text-xs text-muted-foreground">Active teachers</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Classes</CardTitle>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalClasses}</div>
+              <p className="text-xs text-muted-foreground">Total classes</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">Attendance</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.attendanceRate}%</div>
+              <Progress value={stats.attendanceRate} className="mt-2" />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Enrollments</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="border-l-4 border-edu-blue pl-4 py-1">
-                  <p className="text-sm text-gray-600">Today, 9:30 AM</p>
-                  <p className="font-medium">New teacher registered: Sarah Johnson</p>
-                </div>
-                <div className="border-l-4 border-edu-teal pl-4 py-1">
-                  <p className="text-sm text-gray-600">Yesterday, 2:45 PM</p>
-                  <p className="font-medium">Class schedule updated for Grade 10</p>
-                </div>
-                <div className="border-l-4 border-edu-amber pl-4 py-1">
-                  <p className="text-sm text-gray-600">May 15, 11:20 AM</p>
-                  <p className="font-medium">5 new students enrolled in Grade 8</p>
-                </div>
+                {stats.recentEnrollments.map(enrollment => (
+                  <div
+                    key={enrollment.id}
+                    className="flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{enrollment.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {enrollment.class_name}
+                      </p>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(enrollment.date).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xl">Quick Actions</CardTitle>
+            <CardHeader>
+              <CardTitle>Top Performing Classes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <button className="bg-edu-blue text-white w-full py-2 rounded-md hover:bg-blue-700 transition-colors">
-                  Add New Teacher
-                </button>
-                <button className="bg-edu-teal text-white w-full py-2 rounded-md hover:bg-teal-700 transition-colors">
-                  Create Announcement
-                </button>
-                <button className="bg-edu-amber text-white w-full py-2 rounded-md hover:bg-amber-700 transition-colors">
-                  View Reports
-                </button>
+              <div className="space-y-4">
+                {stats.topClasses.map(classInfo => (
+                  <div key={classInfo.id} className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm font-medium">
+                        {classInfo.name}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {classInfo.performance}%
+                      </span>
+                    </div>
+                    <Progress value={classInfo.performance} />
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

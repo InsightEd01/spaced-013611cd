@@ -1,226 +1,195 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { AuthState, LoginCredentials, SignupCredentials, User, UserRole } from '@/types/auth';
-import { toast } from '@/components/ui/sonner';
+import { supabase, getRole } from '@/lib/supabase';
+import { useNavigate } from 'react-router-dom';
 
-interface AuthContextProps {
-  authState: AuthState;
-  login: (credentials: LoginCredentials) => Promise<void>;
-  signup: (credentials: SignupCredentials) => Promise<void>;
-  logout: () => Promise<void>;
-  validateStudentNumber: (studentNumber: string) => Promise<boolean>;
-  linkStudentToParent: (parentId: string, studentId: string) => Promise<void>;
+interface AuthState {
+  user: any;
+  role: string | null;
+  schoolId: string | null;
+  studentIds: string[] | null;
 }
 
-const AuthContext = createContext<AuthContextProps | undefined>(undefined);
+interface AuthContextType {
+  authState: AuthState;
+  signup: (params: { email: string; password: string; studentNumber?: string }) => Promise<void>;
+  login: (params: { email: string; password: string }) => Promise<void>;
+  logout: () => Promise<void>;
+  validateStudentNumber: (studentNumber: string) => Promise<boolean>;
+  loading: boolean;
+}
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
-    session: null,
-    loading: true,
-    error: null,
+    role: null,
+    schoolId: null,
+    studentIds: null,
   });
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for existing session
-    const checkSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        setAuthState(prev => ({ ...prev, loading: false, error: error.message }));
-        return;
-      }
-
-      if (data.session) {
-        // In a real app, we would also fetch additional user data like role
-        setAuthState({
-          user: data.session.user as User,
-          session: data.session,
-          loading: false,
-          error: null,
-        });
-      } else {
-        setAuthState(prev => ({ ...prev, loading: false }));
-      }
-    };
-
+    // Initial session check
     checkSession();
+
+    // Setup auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session) {
+          const role = await getRole();
+          setAuthState({
+            user: session.user,
+            role,
+            schoolId: session.user.user_metadata.school_id,
+            studentIds: session.user.user_metadata.student_ids,
+          });
+        } else {
+          setAuthState({
+            user: null,
+            role: null,
+            schoolId: null,
+            studentIds: null,
+          });
+        }
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const login = async (credentials: LoginCredentials) => {
+  const checkSession = async () => {
     try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      
-      const { data, error } = await supabase.auth.signIn({
-        email: credentials.email,
-        password: credentials.password,
-      });
-
-      if (error) {
-        setAuthState(prev => ({ ...prev, loading: false, error: error.message }));
-        toast.error("Failed to log in", {
-          description: error.message
-        });
-        return;
-      }
-
-      if (data.user && data.session) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const role = await getRole();
         setAuthState({
-          user: data.user as User,
-          session: data.session,
-          loading: false,
-          error: null,
-        });
-        
-        toast.success("Successfully logged in", {
-          description: `Welcome back, ${data.user.email}!`
+          user: session.user,
+          role,
+          schoolId: session.user.user_metadata.school_id,
+          studentIds: session.user.user_metadata.student_ids,
         });
       }
-    } catch (error: any) {
-      setAuthState(prev => ({ ...prev, loading: false, error: error.message }));
-      toast.error("An unexpected error occurred", {
-        description: error.message
-      });
+    } catch (error) {
+      console.error('Error checking session:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const signup = async (credentials: SignupCredentials) => {
+  const signup = async ({ email, password, studentNumber }: { email: string; password: string; studentNumber?: string }) => {
     try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
+      let metadata = {};
       
-      // For parent signup, validate student number first
-      if (credentials.studentNumber) {
-        const isValid = await validateStudentNumber(credentials.studentNumber);
-        if (!isValid) {
-          setAuthState(prev => ({ 
-            ...prev, 
-            loading: false, 
-            error: "Invalid student number. Please check and try again." 
-          }));
-          toast.error("Invalid student number", {
-            description: "Please check the student number and try again."
-          });
-          return;
-        }
-      }
-      
-      const { data, error } = await supabase.auth.signUp({
-        email: credentials.email,
-        password: credentials.password,
-        options: {
-          data: {
-            role: 'parent', // Default role for signup
-          }
-        }
-      });
+      if (studentNumber) {
+        const { data: student } = await supabase
+          .from('students')
+          .select('id, school_id')
+          .eq('student_number', studentNumber)
+          .single();
 
-      if (error) {
-        setAuthState(prev => ({ ...prev, loading: false, error: error.message }));
-        toast.error("Failed to sign up", {
-          description: error.message
-        });
-        return;
-      }
-
-      setAuthState(prev => ({ ...prev, loading: false }));
-      toast.success("Signup successful", {
-        description: "Please check your email for verification."
-      });
-      
-      // Link student to parent if student number was provided
-      if (data.user && credentials.studentNumber) {
-        // Fetch student ID from the student number
-        const studentData = await supabase
-          .from('Students')
-          .select()
-          .eq('student_number', credentials.studentNumber);
+        if (!student) throw new Error('Invalid student number');
         
-        if (studentData.data && studentData.data.length > 0) {
-          await linkStudentToParent(data.user.id, studentData.data[0].id);
-        }
+        metadata = {
+          role: 'parent',
+          school_id: student.school_id,
+          student_ids: [student.id],
+        };
       }
-    } catch (error: any) {
-      setAuthState(prev => ({ ...prev, loading: false, error: error.message }));
-      toast.error("An unexpected error occurred", {
-        description: error.message
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: metadata,
+        },
       });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error signing up:', error);
+      throw error;
+    }
+  };
+
+  const login = async ({ email, password }: { email: string; password: string }) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      // Redirect based on role
+      const role = await getRole();
+      switch (role) {
+        case 'supa_admin':
+          navigate('/admin/dashboard');
+          break;
+        case 'school_admin':
+          navigate('/school/dashboard');
+          break;
+        case 'teacher':
+          navigate('/teacher/dashboard');
+          break;
+        case 'parent':
+          navigate('/parent/dashboard');
+          break;
+        default:
+          navigate('/');
+      }
+    } catch (error) {
+      console.error('Error logging in:', error);
+      throw error;
     }
   };
 
   const logout = async () => {
     try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      
       const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        setAuthState(prev => ({ ...prev, loading: false, error: error.message }));
-        toast.error("Failed to log out", {
-          description: error.message
-        });
-        return;
-      }
-
-      setAuthState({
-        user: null,
-        session: null,
-        loading: false,
-        error: null,
-      });
-      
-      toast.success("Successfully logged out");
-    } catch (error: any) {
-      setAuthState(prev => ({ ...prev, loading: false, error: error.message }));
-      toast.error("An unexpected error occurred", {
-        description: error.message
-      });
+      if (error) throw error;
+      navigate('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      throw error;
     }
   };
 
   const validateStudentNumber = async (studentNumber: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase
-        .from('Students')
-        .select()
-        .eq('student_number', studentNumber);
+      const { data } = await supabase
+        .from('students')
+        .select('id')
+        .eq('student_number', studentNumber)
+        .single();
 
-      if (error) {
-        throw error;
-      }
-
-      return data && data.length > 0;
+      return !!data;
     } catch (error) {
       console.error('Error validating student number:', error);
       return false;
     }
   };
 
-  const linkStudentToParent = async (parentId: string, studentId: string): Promise<void> => {
-    try {
-      // Update the auth.users table to add the student ID to the parent's student_ids array
-      const { error } = await supabase
-        .from('auth.users')
-        .update({ student_ids: [studentId] }) // In a real app, we would append to the existing array
-        .eq('id', parentId);
-
-      if (error) {
-        throw error;
-      }
-    } catch (error) {
-      console.error('Error linking student to parent:', error);
-      throw error;
-    }
-  };
-
   return (
     <AuthContext.Provider
-      value={{ authState, login, signup, logout, validateStudentNumber, linkStudentToParent }}
+      value={{
+        authState,
+        signup,
+        login,
+        logout,
+        validateStudentNumber,
+        loading,
+      }}
     >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

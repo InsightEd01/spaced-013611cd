@@ -1,68 +1,103 @@
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { Toaster } from '@/components/ui/sonner';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { MainLayout } from '@/components/layouts/MainLayout';
 
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
-import ProtectedRoute from "@/components/ProtectedRoute";
+// Pages
+import Login from '@/pages/Login';
+import ParentSignup from '@/pages/ParentSignup';
+import NotFound from '@/pages/NotFound';
 
-import Login from "@/pages/Login";
-import ParentSignup from "@/pages/ParentSignup";
-import AdminDashboard from "@/pages/admin/AdminDashboard";
-import TeacherDashboard from "@/pages/teacher/TeacherDashboard";
-import ParentDashboard from "@/pages/parent/ParentDashboard";
+// Admin Pages
+import SupaAdminDashboard from '@/pages/admin/SupaAdminDashboard';
+import AdminDashboard from '@/pages/admin/AdminDashboard';
 
-const queryClient = new QueryClient();
+// Parent Pages
+import ParentDashboard from '@/pages/parent/ParentDashboard';
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+// Teacher Pages
+import TeacherDashboard from '@/pages/teacher/TeacherDashboard';
+
+function App() {
+  return (
+    <Router>
       <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/parent-signup" element={<ParentSignup />} />
-            
-            {/* Admin Protected Routes */}
-            <Route 
-              path="/admin/dashboard" 
-              element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            
-            {/* Teacher Protected Routes */}
-            <Route 
-              path="/teacher/dashboard" 
-              element={
-                <ProtectedRoute allowedRoles={['teacher']}>
-                  <TeacherDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            
-            {/* Parent Protected Routes */}
-            <Route 
-              path="/parent/dashboard" 
-              element={
-                <ProtectedRoute allowedRoles={['parent']}>
-                  <ParentDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            
-            {/* Redirect to login as default route */}
-            <Route path="/" element={<Login />} />
-            <Route path="*" element={<Login />} />
-          </Routes>
-        </BrowserRouter>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<ParentSignup />} />
+          
+          {/* Protected Routes - Supa Admin */}
+          <Route
+            path="/admin/*"
+            element={
+              <ProtectedRoute allowedRoles={['supa_admin']}>
+                <MainLayout>
+                  <Routes>
+                    <Route path="dashboard" element={<SupaAdminDashboard />} />
+                    {/* Add more admin routes */}
+                  </Routes>
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Protected Routes - School Admin */}
+          <Route
+            path="/school/*"
+            element={
+              <ProtectedRoute allowedRoles={['school_admin']}>
+                <MainLayout>
+                  <Routes>
+                    <Route path="dashboard" element={<AdminDashboard />} />
+                    {/* Add more school admin routes */}
+                  </Routes>
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Protected Routes - Teacher */}
+          <Route
+            path="/teacher/*"
+            element={
+              <ProtectedRoute allowedRoles={['teacher']}>
+                <MainLayout>
+                  <Routes>
+                    <Route path="dashboard" element={<TeacherDashboard />} />
+                    {/* Add more teacher routes */}
+                  </Routes>
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Protected Routes - Parent */}
+          <Route
+            path="/parent/*"
+            element={
+              <ProtectedRoute allowedRoles={['parent']}>
+                <MainLayout>
+                  <Routes>
+                    <Route path="dashboard" element={<ParentDashboard />} />
+                    {/* Add more parent routes */}
+                  </Routes>
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Redirect root to login */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          
+          {/* 404 Not Found */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
         <Toaster />
       </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </Router>
+  );
+}
 
 export default App;

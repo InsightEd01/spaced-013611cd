@@ -1,172 +1,238 @@
-
-import React from 'react';
-import TeacherLayout from '@/components/layouts/TeacherLayout';
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, CheckSquare, FileText, Bell } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Calendar } from '@/components/ui/calendar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Users, BookOpen, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import TeacherLayout from '@/components/layouts/TeacherLayout';
 
-const TeacherDashboard: React.FC = () => {
-  const stats = [
-    {
-      title: 'My Students',
-      value: '58',
-      icon: Users,
-      color: 'bg-blue-100 text-edu-blue',
-    },
-    {
-      title: 'Today\'s Attendance',
-      value: '54/58',
-      icon: CheckSquare,
-      color: 'bg-green-100 text-green-700',
-    },
-    {
-      title: 'Pending Assessments',
-      value: '3',
-      icon: FileText,
-      color: 'bg-purple-100 text-purple-700',
-    },
-    {
-      title: 'New Messages',
-      value: '12',
-      icon: Bell,
-      color: 'bg-amber-100 text-amber-700',
-    },
-  ];
+interface ClassInfo {
+  id: string;
+  name: string;
+  totalStudents: number;
+  attendance: number;
+  subjects: Array<{
+    id: string;
+    name: string;
+    completed: number;
+    total: number;
+  }>;
+  upcomingLessons: Array<{
+    id: string;
+    subject: string;
+    time: string;
+    date: string;
+  }>;
+}
 
-  const todayClasses = [
-    {
-      id: 1,
-      name: 'Mathematics - Grade 9A',
-      time: '08:30 - 09:30',
-      room: 'Room 101',
-    },
-    {
-      id: 2,
-      name: 'Mathematics - Grade 10C',
-      time: '10:00 - 11:00',
-      room: 'Room 205',
-    },
-    {
-      id: 3,
-      name: 'Mathematics - Grade 8B',
-      time: '13:15 - 14:15',
-      room: 'Room 103',
-    },
-    {
-      id: 4,
-      name: 'Mathematics - Grade 9B',
-      time: '14:30 - 15:30',
-      room: 'Room 202',
-    },
-  ];
+const TeacherDashboard = () => {
+  const { authState } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [classes, setClasses] = useState<ClassInfo[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
-  const recentActivity = [
-    {
-      id: 1,
-      type: 'attendance',
-      message: 'Marked attendance for Grade 9A',
-      time: '2 hours ago',
-    },
-    {
-      id: 2,
-      type: 'assessment',
-      message: 'Uploaded math test results for Grade 10C',
-      time: 'Yesterday',
-    },
-    {
-      id: 3,
-      type: 'student',
-      message: 'Added new student: Michael Brown',
-      time: '3 days ago',
-    },
-  ];
+  useEffect(() => {
+    fetchClassInfo();
+  }, []);
+
+  const fetchClassInfo = async () => {
+    try {
+      // Get teacher's classes
+      const { data: teacherClasses, error: classError } = await supabase
+        .from('class_teachers')
+        .select(`
+          classes (
+            id,
+            class_name
+          )
+        `)
+        .eq('teacher_id', authState.user?.id);
+
+      if (classError) throw classError;
+
+      // Get detailed information for each class
+      const classesData = await Promise.all(
+        (teacherClasses || []).map(async ({ classes }) => {
+          // Get total students
+          const { count: studentCount } = await supabase
+            .from('students')
+            .select('*', { count: 'exact' })
+            .eq('class_id', classes.id);
+
+          // Get subjects
+          const { data: subjects } = await supabase
+            .from('subjects')
+            .select('*')
+            .eq('school_id', authState.schoolId);
+
+          // Get upcoming lessons (this would be from a lessons table in a real app)
+          const upcomingLessons = [
+            {
+              id: '1',
+              subject: 'Mathematics',
+              time: '09:00',
+              date: new Date().toISOString(),
+            },
+            // Add more mock data as needed
+          ];
+
+          return {
+            id: classes.id,
+            name: classes.class_name,
+            totalStudents: studentCount || 0,
+            attendance: 90, // This would be calculated from actual attendance records
+            subjects: subjects?.map(s => ({
+              id: s.id,
+              name: s.subject_name,
+              completed: 15, // This would be tracked in a real app
+              total: 30,
+            })) || [],
+            upcomingLessons,
+          };
+        })
+      );
+
+      setClasses(classesData);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching class info:', error);
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
 
   return (
-    <TeacherLayout title="Teacher Dashboard">
+    <TeacherLayout>
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
-            <Card key={index}>
-              <CardContent className="p-6 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">{stat.title}</p>
-                  <h3 className="text-3xl font-bold mt-1">{stat.value}</h3>
-                </div>
-                <div className={`p-3 rounded-full ${stat.color}`}>
-                  <stat.icon className="h-6 w-6" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="md:col-span-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xl">Today's Classes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {todayClasses.map((cls) => (
-                  <div key={cls.id} className="bg-gray-50 p-4 rounded-md">
-                    <div className="flex justify-between items-center">
-                      <h4 className="font-semibold">{cls.name}</h4>
-                      <span className="text-xs font-medium bg-blue-100 text-blue-800 py-1 px-2 rounded">
-                        {cls.time}
-                      </span>
+        <h1 className="text-3xl font-bold">Teacher Dashboard</h1>
+
+        <Tabs defaultValue={classes[0]?.id} className="space-y-6">
+          <TabsList>
+            {classes.map(classInfo => (
+              <TabsTrigger key={classInfo.id} value={classInfo.id}>
+                {classInfo.name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          {classes.map(classInfo => (
+            <TabsContent key={classInfo.id} value={classInfo.id}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Students</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{classInfo.totalStudents}</div>
+                    <p className="text-xs text-muted-foreground">Total students</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Attendance</CardTitle>
+                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{classInfo.attendance}%</div>
+                    <Progress value={classInfo.attendance} className="mt-2" />
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Subjects</CardTitle>
+                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{classInfo.subjects.length}</div>
+                    <p className="text-xs text-muted-foreground">Active subjects</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Next Lesson</CardTitle>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {classInfo.upcomingLessons[0]?.time || 'No lessons'}
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">{cls.room}</p>
-                  </div>
-                ))}
+                    <p className="text-xs text-muted-foreground">
+                      {classInfo.upcomingLessons[0]?.subject}
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xl">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <button className="bg-edu-blue text-white w-full py-2 rounded-md hover:bg-blue-700 transition-colors">
-                  Take Attendance
-                </button>
-                <button className="bg-edu-teal text-white w-full py-2 rounded-md hover:bg-teal-700 transition-colors">
-                  Upload Assessment
-                </button>
-                <button className="bg-edu-amber text-white w-full py-2 rounded-md hover:bg-amber-700 transition-colors">
-                  Send Announcement
-                </button>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Curriculum Progress</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {classInfo.subjects.map(subject => (
+                        <div key={subject.id} className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium">{subject.name}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {subject.completed}/{subject.total} lessons
+                            </span>
+                          </div>
+                          <Progress
+                            value={(subject.completed / subject.total) * 100}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Schedule</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
+                      className="rounded-md border shadow"
+                    />
+                    <div className="mt-4">
+                      <h4 className="text-sm font-semibold mb-2">Today's Lessons</h4>
+                      <div className="space-y-2">
+                        {classInfo.upcomingLessons.map(lesson => (
+                          <div
+                            key={lesson.id}
+                            className="flex items-center justify-between text-sm"
+                          >
+                            <span>{lesson.subject}</span>
+                            <span className="text-muted-foreground">
+                              {lesson.time}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xl">Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-start space-x-3">
-                  <div className={`p-2 rounded-full ${
-                    activity.type === 'attendance' ? 'bg-green-100' :
-                    activity.type === 'assessment' ? 'bg-purple-100' :
-                    'bg-blue-100'
-                  }`}>
-                    {activity.type === 'attendance' && <CheckSquare className="h-5 w-5 text-green-700" />}
-                    {activity.type === 'assessment' && <FileText className="h-5 w-5 text-purple-700" />}
-                    {activity.type === 'student' && <Users className="h-5 w-5 text-blue-700" />}
-                  </div>
-                  <div>
-                    <p className="font-medium">{activity.message}</p>
-                    <p className="text-xs text-gray-500">{activity.time}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+            </TabsContent>
+          ))}
+        </Tabs>
       </div>
     </TeacherLayout>
   );
