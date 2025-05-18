@@ -40,26 +40,47 @@ const TeacherDashboard = () => {
   const fetchClassInfo = async () => {
     try {
       // Get teacher's classes
-      const { data: teacherClasses, error: classError } = await supabase
+      const { data: teacherData } = await supabase
+        .from('teachers')
+        .select('id')
+        .eq('user_id', authState.user?.id)
+        .single();
+        
+      if (!teacherData) {
+        console.error('Teacher data not found');
+        setLoading(false);
+        return;
+      }
+      
+      // Get classes this teacher teaches
+      const { data: teacherClasses } = await supabase
         .from('class_teachers')
         .select(`
-          classes (
-            id,
-            class_name
-          )
+          class_id
         `)
-        .eq('teacher_id', authState.user?.id);
-
-      if (classError) throw classError;
+        .eq('teacher_id', teacherData.id);
+        
+      if (!teacherClasses || teacherClasses.length === 0) {
+        setLoading(false);
+        return;
+      }
+      
+      const classIds = teacherClasses.map(tc => tc.class_id);
+      
+      // Get class details
+      const { data: classesData } = await supabase
+        .from('classes')
+        .select('id, class_name')
+        .in('id', classIds);
 
       // Get detailed information for each class
-      const classesData = await Promise.all(
-        (teacherClasses || []).map(async ({ classes }) => {
+      const classesInfo = await Promise.all(
+        (classesData || []).map(async (classItem) => {
           // Get total students
           const { count: studentCount } = await supabase
             .from('students')
             .select('*', { count: 'exact' })
-            .eq('class_id', classes.id);
+            .eq('class_id', classItem.id);
 
           // Get subjects
           const { data: subjects } = await supabase
@@ -79,8 +100,8 @@ const TeacherDashboard = () => {
           ];
 
           return {
-            id: classes.id,
-            name: classes.class_name,
+            id: classItem.id,
+            name: classItem.class_name,
             totalStudents: studentCount || 0,
             attendance: 90, // This would be calculated from actual attendance records
             subjects: subjects?.map(s => ({
@@ -94,7 +115,7 @@ const TeacherDashboard = () => {
         })
       );
 
-      setClasses(classesData);
+      setClasses(classesInfo);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching class info:', error);
@@ -111,7 +132,7 @@ const TeacherDashboard = () => {
   }
 
   return (
-    <TeacherLayout>
+    <TeacherLayout title="Teacher Dashboard">
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Teacher Dashboard</h1>
 

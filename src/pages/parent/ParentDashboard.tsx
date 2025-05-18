@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -48,7 +47,7 @@ const ParentDashboard: React.FC = () => {
           first_name,
           last_name,
           class_id,
-          classes:class_id (class_name)
+          class_name
         `)
         .in('id', authState.studentIds);
 
@@ -61,11 +60,31 @@ const ParentDashboard: React.FC = () => {
           const { data: subjects } = await supabase
             .from('student_subjects')
             .select(`
-              subjects:subject_id (subject_name),
+              subject_id,
               grade,
               progress
             `)
             .eq('student_id', student.id);
+
+          // Get subject names
+          const subjectDetails = [];
+          if (subjects && subjects.length > 0) {
+            for (const subject of subjects) {
+              const { data: subjectData } = await supabase
+                .from('subjects')
+                .select('subject_name')
+                .eq('id', subject.subject_id)
+                .single();
+                
+              if (subjectData) {
+                subjectDetails.push({
+                  name: subjectData.subject_name,
+                  grade: subject.grade || 'N/A',
+                  progress: subject.progress || 0
+                });
+              }
+            }
+          }
 
           // Fetch upcoming events
           const { data: events } = await supabase
@@ -78,13 +97,9 @@ const ParentDashboard: React.FC = () => {
           return {
             id: student.id,
             name: `${student.first_name} ${student.last_name}`,
-            class_name: student.classes?.class_name || '',
+            class_name: student.class_name || '',
             attendance: 95, // This would come from an attendance tracking system
-            subjects: subjects?.map(s => ({
-              name: s.subjects.subject_name,
-              grade: s.grade || 'N/A',
-              progress: s.progress || 0
-            })) || [],
+            subjects: subjectDetails,
             upcoming_events: events?.map(e => ({
               id: e.id,
               title: e.assessment_name,

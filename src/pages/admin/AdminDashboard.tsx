@@ -68,9 +68,10 @@ const AdminDashboard = () => {
         .from('students')
         .select(`
           id,
-          name,
-          classes (class_name),
-          created_at
+          first_name,
+          last_name,
+          class_id,
+          class_name
         `)
         .eq('school_id', authState.schoolId)
         .order('created_at', { ascending: false })
@@ -90,8 +91,8 @@ const AdminDashboard = () => {
         attendanceRate: 92, // This would be calculated from actual attendance records
         recentEnrollments: recentEnrollments?.map(e => ({
           id: e.id,
-          name: e.name,
-          class_name: e.classes?.class_name || '',
+          name: `${e.first_name} ${e.last_name}`,
+          class_name: e.class_name || '',
           date: e.created_at,
         })) || [],
         topClasses: mockTopClasses,
@@ -113,7 +114,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <AdminLayout>
+    <AdminLayout title="School Dashboard">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">School Dashboard</h1>

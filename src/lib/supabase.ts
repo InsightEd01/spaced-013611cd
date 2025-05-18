@@ -8,6 +8,7 @@ const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
+// Get the user's role from their metadata
 export const getRole = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;

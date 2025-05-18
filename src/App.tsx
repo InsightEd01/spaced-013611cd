@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from '@/components/ui/sonner';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { MainLayout } from '@/components/layouts/MainLayout';
+import MainLayout from '@/components/layouts/MainLayout';
 
 // Pages
 import Login from '@/pages/Login';
