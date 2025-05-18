@@ -1,3 +1,4 @@
+
 import { supabase } from './supabase';
 
 export async function signIn(email: string, password: string) {
@@ -22,14 +23,14 @@ export async function getSession() {
 }
 
 export async function getUserRole() {
-  const session = await getSession();
-  if (!session) return null;
-  return session.user.user_metadata.role;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  return user.user_metadata.role as string;
 }
 
 export async function resetPassword(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: \`\${window.location.origin}/reset-password\`,
+    redirectTo: `${window.location.origin}/reset-password`,
   });
   if (error) throw error;
 }

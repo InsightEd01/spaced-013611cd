@@ -1,12 +1,16 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, getRole } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface AuthState {
   user: any;
   role: string | null;
   schoolId: string | null;
   studentIds: string[] | null;
+  loading: boolean;
+  error: string | null;
 }
 
 interface AuthContextType {
@@ -15,19 +19,21 @@ interface AuthContextType {
   login: (params: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   validateStudentNumber: (studentNumber: string) => Promise<boolean>;
-  loading: boolean;
 }
+
+const initialAuthState: AuthState = {
+  user: null,
+  role: null,
+  schoolId: null,
+  studentIds: null,
+  loading: true,
+  error: null,
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    role: null,
-    schoolId: null,
-    studentIds: null,
-  });
-  const [loading, setLoading] = useState(true);
+  const [authState, setAuthState] = useState<AuthState>(initialAuthState);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -44,6 +50,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             role,
             schoolId: session.user.user_metadata.school_id,
             studentIds: session.user.user_metadata.student_ids,
+            loading: false,
+            error: null,
           });
         } else {
           setAuthState({
@@ -51,9 +59,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             role: null,
             schoolId: null,
             studentIds: null,
+            loading: false,
+            error: null,
           });
         }
-        setLoading(false);
       }
     );
 
@@ -72,27 +81,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role,
           schoolId: session.user.user_metadata.school_id,
           studentIds: session.user.user_metadata.student_ids,
+          loading: false,
+          error: null,
+        });
+      } else {
+        setAuthState({
+          ...initialAuthState,
+          loading: false,
         });
       }
     } catch (error) {
       console.error('Error checking session:', error);
-    } finally {
-      setLoading(false);
+      setAuthState({
+        ...initialAuthState,
+        loading: false,
+        error: 'Failed to check authentication session',
+      });
     }
   };
 
   const signup = async ({ email, password, studentNumber }: { email: string; password: string; studentNumber?: string }) => {
     try {
+      setAuthState(state => ({ ...state, error: null }));
       let metadata = {};
       
       if (studentNumber) {
-        const { data: student } = await supabase
+        const { data: student, error: studentError } = await supabase
           .from('students')
           .select('id, school_id')
           .eq('student_number', studentNumber)
           .single();
 
-        if (!student) throw new Error('Invalid student number');
+        if (studentError || !student) {
+          throw new Error('Invalid student number');
+        }
         
         metadata = {
           role: 'parent',
@@ -110,14 +132,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) throw error;
-    } catch (error) {
+      
+      toast.success('Account created successfully! Please check your email for verification.');
+    } catch (error: any) {
       console.error('Error signing up:', error);
+      setAuthState(state => ({ ...state, error: error.message }));
+      toast.error(error.message || 'Failed to sign up');
       throw error;
     }
   };
 
   const login = async ({ email, password }: { email: string; password: string }) => {
     try {
+      setAuthState(state => ({ ...state, error: null }));
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -125,26 +152,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
 
-      // Redirect based on role
-      const role = await getRole();
-      switch (role) {
-        case 'supa_admin':
-          navigate('/admin/dashboard');
-          break;
-        case 'school_admin':
-          navigate('/school/dashboard');
-          break;
-        case 'teacher':
-          navigate('/teacher/dashboard');
-          break;
-        case 'parent':
-          navigate('/parent/dashboard');
-          break;
-        default:
-          navigate('/');
-      }
-    } catch (error) {
+      // Role and redirect are handled by the auth state change listener
+      toast.success('Logged in successfully!');
+    } catch (error: any) {
       console.error('Error logging in:', error);
+      setAuthState(state => ({ ...state, error: error.message }));
+      toast.error(error.message || 'Failed to log in');
       throw error;
     }
   };
@@ -153,20 +166,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      navigate('/login');
-    } catch (error) {
+      
+      // Redirect to login page is handled by auth state change listener
+      toast.success('Logged out successfully');
+    } catch (error: any) {
       console.error('Error logging out:', error);
+      toast.error(error.message || 'Failed to log out');
       throw error;
     }
   };
 
   const validateStudentNumber = async (studentNumber: string): Promise<boolean> => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('students')
         .select('id')
         .eq('student_number', studentNumber)
         .single();
+
+      if (error) {
+        console.error('Error validating student number:', error);
+        return false;
+      }
 
       return !!data;
     } catch (error) {
@@ -183,7 +204,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         validateStudentNumber,
-        loading,
       }}
     >
       {children}

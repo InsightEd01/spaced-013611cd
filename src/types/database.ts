@@ -1,3 +1,4 @@
+
 export type Json =
   | string
   | number
@@ -151,24 +152,27 @@ export interface Database {
         Row: {
           id: string
           student_number: string
-          name: string
-          class_id: string
+          first_name: string
+          last_name: string
+          class_id: string | null
           school_id: string
           created_at: string
         }
         Insert: {
           id?: string
           student_number: string
-          name: string
-          class_id: string
+          first_name: string
+          last_name: string
+          class_id?: string | null
           school_id: string
           created_at?: string
         }
         Update: {
           id?: string
           student_number?: string
-          name?: string
-          class_id?: string
+          first_name?: string
+          last_name?: string
+          class_id?: string | null
           school_id?: string
           created_at?: string
         }
