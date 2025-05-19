@@ -1,13 +1,14 @@
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from '@/components/ui/sonner';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import MainLayout from '@/components/layouts/MainLayout';
 
 // Pages
 import Login from '@/pages/Login';
 import ParentSignup from '@/pages/ParentSignup';
 import NotFound from '@/pages/NotFound';
+import Index from '@/pages/Index';
 
 // Admin Pages
 import SupaAdminDashboard from '@/pages/admin/SupaAdminDashboard';
@@ -15,6 +16,11 @@ import AdminDashboard from '@/pages/admin/AdminDashboard';
 
 // Parent Pages
 import ParentDashboard from '@/pages/parent/ParentDashboard';
+import ParentAttendance from '@/pages/parent/ParentAttendance';
+import ParentReports from '@/pages/parent/ParentReports';
+import ParentAnnouncements from '@/pages/parent/ParentAnnouncements';
+import ParentFeedback from '@/pages/parent/ParentFeedback';
+import ParentSettings from '@/pages/parent/ParentSettings';
 
 // Teacher Pages
 import TeacherDashboard from '@/pages/teacher/TeacherDashboard';
@@ -25,6 +31,7 @@ function App() {
       <AuthProvider>
         <Routes>
           {/* Public Routes */}
+          <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<ParentSignup />} />
           
@@ -33,12 +40,10 @@ function App() {
             path="/admin/*"
             element={
               <ProtectedRoute allowedRoles={['supa_admin']}>
-                <MainLayout>
-                  <Routes>
-                    <Route path="dashboard" element={<SupaAdminDashboard />} />
-                    {/* Add more admin routes */}
-                  </Routes>
-                </MainLayout>
+                <Routes>
+                  <Route path="dashboard" element={<SupaAdminDashboard />} />
+                  {/* Add more admin routes */}
+                </Routes>
               </ProtectedRoute>
             }
           />
@@ -48,12 +53,10 @@ function App() {
             path="/school/*"
             element={
               <ProtectedRoute allowedRoles={['school_admin']}>
-                <MainLayout>
-                  <Routes>
-                    <Route path="dashboard" element={<AdminDashboard />} />
-                    {/* Add more school admin routes */}
-                  </Routes>
-                </MainLayout>
+                <Routes>
+                  <Route path="dashboard" element={<AdminDashboard />} />
+                  {/* Add more school admin routes */}
+                </Routes>
               </ProtectedRoute>
             }
           />
@@ -63,12 +66,10 @@ function App() {
             path="/teacher/*"
             element={
               <ProtectedRoute allowedRoles={['teacher']}>
-                <MainLayout>
-                  <Routes>
-                    <Route path="dashboard" element={<TeacherDashboard />} />
-                    {/* Add more teacher routes */}
-                  </Routes>
-                </MainLayout>
+                <Routes>
+                  <Route path="dashboard" element={<TeacherDashboard />} />
+                  {/* Add more teacher routes */}
+                </Routes>
               </ProtectedRoute>
             }
           />
@@ -78,18 +79,17 @@ function App() {
             path="/parent/*"
             element={
               <ProtectedRoute allowedRoles={['parent']}>
-                <MainLayout>
-                  <Routes>
-                    <Route path="dashboard" element={<ParentDashboard />} />
-                    {/* Add more parent routes */}
-                  </Routes>
-                </MainLayout>
+                <Routes>
+                  <Route path="dashboard" element={<ParentDashboard />} />
+                  <Route path="attendance" element={<ParentAttendance />} />
+                  <Route path="reports" element={<ParentReports />} />
+                  <Route path="announcements" element={<ParentAnnouncements />} />
+                  <Route path="feedback" element={<ParentFeedback />} />
+                  <Route path="settings" element={<ParentSettings />} />
+                </Routes>
               </ProtectedRoute>
             }
           />
-
-          {/* Redirect root to login */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
           
           {/* 404 Not Found */}
           <Route path="*" element={<NotFound />} />

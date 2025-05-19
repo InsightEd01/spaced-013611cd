@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -11,7 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { PlusCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 // Define interfaces for the data types
 interface Student {
@@ -19,6 +20,7 @@ interface Student {
   first_name: string;
   last_name: string;
   class_name: string;
+  class_id?: string;
 }
 
 interface Subject {
@@ -52,20 +54,28 @@ const ParentDashboard = () => {
   const fetchStudentData = async () => {
     try {
       // Fetch student information
-      const { data: studentsData } = await supabase
+      const { data: studentsData, error: studentsError } = await supabase
         .from('students')
-        .select('id, first_name, last_name, class_name')
+        .select('id, first_name, last_name, class_name, class_id')
         .in('id', authState.studentIds || []);
+
+      if (studentsError) {
+        throw studentsError;
+      }
 
       if (studentsData) {
         setStudents(studentsData);
 
         // Fetch subjects for the first student
         if (studentsData.length > 0) {
-          const { data: subjectsData } = await supabase
+          const { data: subjectsData, error: subjectsError } = await supabase
             .from('subjects')
             .select('id, subject_name')
             .eq('school_id', authState.schoolId);
+
+          if (subjectsError) {
+            throw subjectsError;
+          }
 
           if (subjectsData) {
             // Mock progress data for demonstration
@@ -77,14 +87,20 @@ const ParentDashboard = () => {
           }
 
           // Fetch announcements for the student's class
-          const { data: announcementsData } = await supabase
-            .from('announcements')
-            .select('id, title, content, date')
-            .eq('class_id', studentsData[0].class_id)
-            .order('date', { ascending: false });
+          if (studentsData[0].class_id) {
+            const { data: announcementsData, error: announcementsError } = await supabase
+              .from('announcements')
+              .select('id, title, content, date')
+              .eq('class_id', studentsData[0].class_id)
+              .order('date', { ascending: false });
 
-          if (announcementsData) {
-            setAnnouncements(announcementsData);
+            if (announcementsError) {
+              throw announcementsError;
+            }
+
+            if (announcementsData) {
+              setAnnouncements(announcementsData);
+            }
           }
         }
       }
@@ -92,6 +108,7 @@ const ParentDashboard = () => {
       setLoading(false);
     } catch (error) {
       console.error('Error fetching student data:', error);
+      toast.error('Failed to load student data');
       setLoading(false);
     }
   };
@@ -105,7 +122,7 @@ const ParentDashboard = () => {
   }
 
   return (
-    <ParentLayout>
+    <ParentLayout title="Dashboard">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>

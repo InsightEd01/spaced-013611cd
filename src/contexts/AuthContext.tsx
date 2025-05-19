@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +15,7 @@ interface AuthState {
 
 interface AuthContextType {
   authState: AuthState;
-  loading: boolean; // Added this property to fix ProtectedRoute component
+  loading: boolean;
   signup: (params: { email: string; password: string; studentNumber?: string }) => Promise<void>;
   login: (params: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
@@ -44,7 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session) {
-          const role = await getRole();
+          // Get the user's role from metadata
+          const role = session.user.user_metadata.role;
           setAuthState({
             user: session.user,
             role,
@@ -75,7 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        const role = await getRole();
+        // Get the user's role from metadata
+        const role = session.user.user_metadata.role;
         setAuthState({
           user: session.user,
           role,
@@ -200,7 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         authState,
-        loading: authState.loading, // Expose loading state directly
+        loading: authState.loading,
         signup,
         login,
         logout,

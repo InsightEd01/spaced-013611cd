@@ -13,7 +13,7 @@ import {
 
 interface ParentLayoutProps {
   children: React.ReactNode;
-  title: string;
+  title?: string;
 }
 
 const ParentLayout: React.FC<ParentLayoutProps> = ({ children, title }) => {
