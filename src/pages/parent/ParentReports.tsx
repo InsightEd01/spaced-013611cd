@@ -41,6 +41,12 @@ interface Subject {
   subject_name: string;
   assessments: Assessment[];
   averageScore: number;
+  progress: number; // Adding progress property to the Subject interface
+}
+
+interface ChartDataPoint {
+  name: string;
+  score: number;
 }
 
 const ParentReports = () => {
@@ -177,7 +183,7 @@ const ParentReports = () => {
     }
   };
 
-  const prepareChartData = () => {
+  const prepareChartData = (): ChartDataPoint[] => {
     // Prepare data for the performance chart
     return subjects.map(subject => ({
       name: subject.subject_name,
@@ -239,7 +245,14 @@ const ParentReports = () => {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis domain={[0, 100]} />
-                      <Tooltip formatter={(value) => [`${value.toFixed(1)}%`, 'Score']} />
+                      <Tooltip 
+                        formatter={(value: number | string) => {
+                          // Ensure value is a number before calling toFixed
+                          return typeof value === 'number' 
+                            ? [`${value.toFixed(1)}%`, 'Score'] 
+                            : [value, 'Score'];
+                        }} 
+                      />
                       <Legend />
                       <Bar dataKey="score" name="Score (%)" fill="#8884d8" />
                     </BarChart>
@@ -263,8 +276,8 @@ const ParentReports = () => {
                     <CardContent>
                       <div className="mb-4">
                         <h4 className="text-sm font-medium mb-1">Progress</h4>
-                        <Progress value={subject.progress || 0} className="h-2" />
-                        <p className="text-xs text-gray-500 mt-1">{subject.progress || 0}% Complete</p>
+                        <Progress value={subject.progress} className="h-2" />
+                        <p className="text-xs text-gray-500 mt-1">{subject.progress}% Complete</p>
                       </div>
                       
                       {subject.assessments.length > 0 ? (
