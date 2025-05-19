@@ -148,14 +148,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async ({ email, password }: { email: string; password: string }) => {
     try {
       setAuthState(state => ({ ...state, error: null }));
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
 
-      // Role and redirect are handled by the auth state change listener
+      const role = data.user.user_metadata.role;
+      
+      // Special handling for supa_admin
+      if (role === 'supa_admin') {
+        window.location.href = '/admin/dashboard';
+        return;
+      }
+      
+      setAuthState({
+        user: data.user,
+        role,
+        schoolId: data.user.user_metadata.school_id,
+        studentIds: data.user.user_metadata.student_ids,
+        loading: false,
+        error: null,
+      });
+      
       toast.success('Logged in successfully!');
     } catch (error: any) {
       console.error('Error logging in:', error);

@@ -42,7 +42,7 @@ function App() {
               <ProtectedRoute allowedRoles={['supa_admin']}>
                 <Routes>
                   <Route path="dashboard" element={<SupaAdminDashboard />} />
-                  {/* Add more admin routes */}
+                  <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
                 </Routes>
               </ProtectedRoute>
             }

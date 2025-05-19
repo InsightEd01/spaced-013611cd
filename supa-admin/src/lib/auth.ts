@@ -28,6 +28,11 @@ export async function getUserRole() {
   return user.user_metadata.role as string;
 }
 
+export async function isSupaAdmin() {
+  const role = await getUserRole();
+  return role === 'supa_admin';
+}
+
 export async function resetPassword(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/reset-password`,

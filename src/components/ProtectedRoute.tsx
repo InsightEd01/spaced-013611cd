@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +24,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
 
   if (!authState.user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Special case for supa_admin, redirect to separate app
+  if (authState.role === 'supa_admin' && !allowedRoles?.includes('supa_admin')) {
+    window.location.href = '/admin/dashboard';
+    return null;
   }
 
   if (allowedRoles && !allowedRoles.includes(authState.role || '')) {

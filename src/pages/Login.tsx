@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -24,9 +24,12 @@ const Login: React.FC = () => {
       
       // If login was successful, navigate based on role
       if (authState.user) {
-        switch (authState.user.role) {
-          case 'admin':
-            navigate('/admin/dashboard');
+        switch (authState.role) {
+          case 'supa_admin':
+            window.location.href = '/admin/dashboard'; // Redirect to supa admin dashboard
+            break;
+          case 'school_admin':
+            navigate('/school/dashboard');
             break;
           case 'teacher':
             navigate('/teacher/dashboard');
@@ -45,6 +48,28 @@ const Login: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  // Check if user is already logged in and redirect
+  useEffect(() => {
+    if (authState.user && !authState.loading) {
+      switch (authState.role) {
+        case 'supa_admin':
+          window.location.href = '/admin/dashboard'; // Redirect to supa admin dashboard
+          break;
+        case 'school_admin':
+          navigate('/school/dashboard');
+          break;
+        case 'teacher':
+          navigate('/teacher/dashboard');
+          break;
+        case 'parent':
+          navigate('/parent/dashboard');
+          break;
+        default:
+          navigate('/');
+      }
+    }
+  }, [authState.user, authState.loading, authState.role, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -119,7 +144,7 @@ const Login: React.FC = () => {
           <CardFooter className="flex justify-center">
             <p className="text-sm text-gray-600">
               Are you a parent?{' '}
-              <Link to="/parent-signup" className="text-edu-blue hover:underline">
+              <Link to="/signup" className="text-edu-blue hover:underline">
                 Sign up here
               </Link>
             </p>
@@ -128,7 +153,8 @@ const Login: React.FC = () => {
         
         <div className="text-center text-sm text-gray-500">
           <p>Demo accounts:</p>
-          <p>Admin: admin@school.com / password</p>
+          <p>Supa Admin: supa@admin.com / password</p>
+          <p>School Admin: admin@school.com / password</p>
           <p>Teacher: teacher@school.com / password</p>
           <p>Parent: parent@example.com / password</p>
         </div>
