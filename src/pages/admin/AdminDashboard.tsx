@@ -34,6 +34,16 @@ interface SchoolStats {
   }>;
 }
 
+// Define the interface for enrollment data
+interface EnrollmentData {
+  id: string;
+  first_name: string;
+  last_name: string;
+  class_id: string;
+  class_name: string;
+  created_at: string;
+}
+
 const AdminDashboard = () => {
   const { authState } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -71,7 +81,8 @@ const AdminDashboard = () => {
           first_name,
           last_name,
           class_id,
-          class_name
+          class_name,
+          created_at
         `)
         .eq('school_id', authState.schoolId)
         .order('created_at', { ascending: false })
@@ -89,7 +100,7 @@ const AdminDashboard = () => {
         totalTeachers: teacherCount || 0,
         totalClasses: classCount || 0,
         attendanceRate: 92, // This would be calculated from actual attendance records
-        recentEnrollments: recentEnrollments?.map(e => ({
+        recentEnrollments: recentEnrollments?.map((e: EnrollmentData) => ({
           id: e.id,
           name: `${e.first_name} ${e.last_name}`,
           class_name: e.class_name || '',
@@ -128,6 +139,7 @@ const AdminDashboard = () => {
           </div>
         </div>
 
+        {/* Stats cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -176,6 +188,7 @@ const AdminDashboard = () => {
           </Card>
         </div>
 
+        {/* Recent Enrollments */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
@@ -202,7 +215,10 @@ const AdminDashboard = () => {
               </div>
             </CardContent>
           </Card>
+        </div>
 
+        {/* Top Performing Classes */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Top Performing Classes</CardTitle>

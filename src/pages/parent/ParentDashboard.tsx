@@ -2,118 +2,96 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import ParentLayout from '@/components/layouts/ParentLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar } from '@/components/ui/calendar';
-import { BookOpen, GraduationCap, Trophy, Bell } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { PlusCircle } from 'lucide-react';
 
-interface StudentInfo {
+// Define interfaces for the data types
+interface Student {
   id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   class_name: string;
-  attendance: number;
-  subjects: Array<{
-    name: string;
-    grade: string;
-    progress: number;
-  }>;
-  upcoming_events: Array<{
-    id: string;
-    title: string;
-    date: string;
-    type: string;
-  }>;
 }
 
-const ParentDashboard: React.FC = () => {
+interface Subject {
+  id: string;
+  subject_name: string;
+  progress: number;
+}
+
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+}
+
+const ParentDashboard = () => {
   const { authState } = useAuth();
+  const [students, setStudents] = useState<Student[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [students, setStudents] = useState<StudentInfo[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   useEffect(() => {
-    fetchStudentInfo();
+    if (authState.studentIds && authState.studentIds.length > 0) {
+      fetchStudentData();
+    } else {
+      setLoading(false);
+    }
   }, [authState.studentIds]);
 
-  const fetchStudentInfo = async () => {
+  const fetchStudentData = async () => {
     try {
-      if (!authState.studentIds?.length) return;
-
-      const { data: studentsData, error } = await supabase
+      // Fetch student information
+      const { data: studentsData } = await supabase
         .from('students')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          class_id,
-          class_name
-        `)
-        .in('id', authState.studentIds);
+        .select('id, first_name, last_name, class_name')
+        .in('id', authState.studentIds || []);
 
-      if (error) throw error;
+      if (studentsData) {
+        setStudents(studentsData);
 
-      // Transform and enrich the data
-      const enrichedData: StudentInfo[] = await Promise.all(
-        (studentsData || []).map(async (student) => {
-          // Fetch subjects and grades
-          const { data: subjects } = await supabase
-            .from('student_subjects')
-            .select(`
-              subject_id,
-              grade,
-              progress
-            `)
-            .eq('student_id', student.id);
+        // Fetch subjects for the first student
+        if (studentsData.length > 0) {
+          const { data: subjectsData } = await supabase
+            .from('subjects')
+            .select('id, subject_name')
+            .eq('school_id', authState.schoolId);
 
-          // Get subject names
-          const subjectDetails = [];
-          if (subjects && subjects.length > 0) {
-            for (const subject of subjects) {
-              const { data: subjectData } = await supabase
-                .from('subjects')
-                .select('subject_name')
-                .eq('id', subject.subject_id)
-                .single();
-                
-              if (subjectData) {
-                subjectDetails.push({
-                  name: subjectData.subject_name,
-                  grade: subject.grade || 'N/A',
-                  progress: subject.progress || 0
-                });
-              }
-            }
+          if (subjectsData) {
+            // Mock progress data for demonstration
+            const subjectsWithProgress = subjectsData.map((subject: any) => ({
+              ...subject,
+              progress: Math.floor(Math.random() * 100),
+            }));
+            setSubjects(subjectsWithProgress);
           }
 
-          // Fetch upcoming events
-          const { data: events } = await supabase
-            .from('assessments')
-            .select('*')
-            .gte('date', new Date().toISOString())
-            .order('date')
-            .limit(5);
+          // Fetch announcements for the student's class
+          const { data: announcementsData } = await supabase
+            .from('announcements')
+            .select('id, title, content, date')
+            .eq('class_id', studentsData[0].class_id)
+            .order('date', { ascending: false });
 
-          return {
-            id: student.id,
-            name: `${student.first_name} ${student.last_name}`,
-            class_name: student.class_name || '',
-            attendance: 95, // This would come from an attendance tracking system
-            subjects: subjectDetails,
-            upcoming_events: events?.map(e => ({
-              id: e.id,
-              title: e.assessment_name,
-              date: e.date,
-              type: e.assessment_type
-            })) || []
-          };
-        })
-      );
+          if (announcementsData) {
+            setAnnouncements(announcementsData);
+          }
+        }
+      }
 
-      setStudents(enrichedData);
+      setLoading(false);
     } catch (error) {
-      console.error('Error fetching student info:', error);
-    } finally {
+      console.error('Error fetching student data:', error);
       setLoading(false);
     }
   };
@@ -127,124 +105,74 @@ const ParentDashboard: React.FC = () => {
   }
 
   return (
-    <ParentLayout title="Parent Dashboard">
+    <ParentLayout>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Parent Dashboard</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-gray-500">
+            Welcome to your parent dashboard. Here you can view your children's
+            information.
+          </p>
+        </div>
 
-        <Tabs defaultValue={students[0]?.id} className="space-y-6">
-          <TabsList>
-            {students.map(student => (
-              <TabsTrigger key={student.id} value={student.id}>
-                {student.name}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        {students.map(student => (
+          <div key={student.id} className="space-y-4">
+            <h2 className="text-2xl font-semibold">
+              {student.first_name} {student.last_name}
+            </h2>
+            <p className="text-gray-600">Class: {student.class_name}</p>
 
-          {students.map(student => (
-            <TabsContent key={student.id} value={student.id} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium">Class</CardTitle>
-                    <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{student.class_name}</div>
-                    <p className="text-xs text-muted-foreground">Current class</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium">Attendance</CardTitle>
-                    <BookOpen className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{student.attendance}%</div>
-                    <Progress value={student.attendance} className="mt-2" />
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium">Subjects</CardTitle>
-                    <Trophy className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{student.subjects.length}</div>
-                    <p className="text-xs text-muted-foreground">Enrolled subjects</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium">Events</CardTitle>
-                    <Bell className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {student.upcoming_events.length}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Upcoming events</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Subject Progress</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {student.subjects.map(subject => (
-                        <div key={subject.name} className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium">{subject.name}</span>
-                            <span className="text-sm text-muted-foreground">
-                              Grade: {subject.grade}
-                            </span>
-                          </div>
-                          <Progress value={subject.progress} />
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Calendar</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      className="rounded-md border shadow"
-                    />
-                    <div className="mt-4">
-                      <h4 className="text-sm font-semibold mb-2">Upcoming Events</h4>
-                      <div className="space-y-2">
-                        {student.upcoming_events.map(event => (
-                          <div
-                            key={event.id}
-                            className="flex items-center justify-between text-sm"
-                          >
-                            <span>{event.title}</span>
-                            <span className="text-muted-foreground">
-                              {new Date(event.date).toLocaleDateString()}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          ))}
-        </Tabs>
+            <Tabs defaultValue="subjects" className="w-full">
+              <TabsList>
+                <TabsTrigger value="subjects">Subjects</TabsTrigger>
+                <TabsTrigger value="announcements">Announcements</TabsTrigger>
+                <TabsTrigger value="attendance">Attendance</TabsTrigger>
+              </TabsList>
+              <TabsContent value="subjects" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {subjects.map(subject => (
+                    <Card key={subject.id}>
+                      <CardHeader>
+                        <CardTitle>{subject.subject_name}</CardTitle>
+                        <CardDescription>
+                          {student.first_name}'s progress in {subject.subject_name}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Progress value={subject.progress} />
+                        <p className="text-sm text-gray-500 mt-2">
+                          {subject.progress}% Complete
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </TabsContent>
+              <TabsContent value="announcements" className="space-y-4">
+                <div className="space-y-4">
+                  {announcements.map(announcement => (
+                    <Card key={announcement.id}>
+                      <CardHeader>
+                        <CardTitle>{announcement.title}</CardTitle>
+                        <CardDescription>
+                          {new Date(announcement.date).toLocaleDateString()}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p>{announcement.content}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </TabsContent>
+              <TabsContent value="attendance">
+                <div>
+                  <p>Attendance information will be displayed here.</p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        ))}
       </div>
     </ParentLayout>
   );
