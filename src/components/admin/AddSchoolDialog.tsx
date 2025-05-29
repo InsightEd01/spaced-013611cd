@@ -64,7 +64,11 @@ export function AddSchoolDialog({ onSchoolAdded }: SchoolDialogProps) {
     try {
       const { error } = await supabase
         .from('schools')
-        .insert(data);
+        .insert({
+          name: data.name,
+          region: data.region,
+          subscription_plan: data.subscription_plan
+        });
 
       if (error) throw error;
 

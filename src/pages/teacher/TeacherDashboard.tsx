@@ -1,225 +1,235 @@
 
-import React, { useEffect, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
-import TeacherLayout from '@/components/layouts/TeacherLayout';
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { AlertCircle, Award, BookOpen, Users } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { CalendarDays, Users, BookOpen, TrendingUp, Clock, CheckCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
+import TeacherLayout from '@/components/layouts/TeacherLayout';
+import { AttendanceInterface } from '@/components/teacher/AttendanceInterface';
+import { AssessmentManager } from '@/components/teacher/AssessmentManager';
+import { AnnouncementCreator } from '@/components/teacher/AnnouncementCreator';
 
-// Define interfaces for the data types
-interface TeacherClass {
-  id: string;
-  class_name: string;
+interface TeacherStats {
+  totalStudents: number;
+  totalClasses: number;
+  pendingAssessments: number;
+  todayAttendance: number;
 }
 
 interface Student {
   id: string;
   first_name: string;
   last_name: string;
+  classes?: { class_name: string };
 }
 
-const TeacherDashboard = () => {
-  const { authState } = useAuth();
-  const [teacherId, setTeacherId] = useState<string | null>(null);
-  const [classes, setClasses] = useState<TeacherClass[]>([]);
-  const [selectedClass, setSelectedClass] = useState<string | null>(null);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
+export default function TeacherDashboard() {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [stats, setStats] = useState<TeacherStats>({
     totalStudents: 0,
     totalClasses: 0,
-    attendanceRate: 85,
-    upcomingTests: 3,
+    pendingAssessments: 0,
+    todayAttendance: 0,
   });
+  const [recentStudents, setRecentStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchTeacherData();
-  }, [authState.user?.id]);
+    fetchDashboardData();
+  }, []);
 
-  const fetchTeacherData = async () => {
+  const fetchDashboardData = async () => {
     try {
-      // Get teacher ID
-      const { data: teacher } = await supabase
-        .from('teachers')
-        .select('id')
-        .eq('user_id', authState.user?.id)
-        .single();
+      setLoading(true);
 
-      if (teacher) {
-        setTeacherId(teacher.id);
+      // Fetch students count
+      const { count: studentsCount } = await supabase
+        .from('students')
+        .select('*', { count: 'exact', head: true });
 
-        // Get teacher's classes
-        const { data: classesData } = await supabase
-          .from('class_teachers')
-          .select(`
-            class_id,
-            classes (
-              id, 
-              class_name
-            )
-          `)
-          .eq('teacher_id', teacher.id);
+      // Fetch classes count
+      const { count: classesCount } = await supabase
+        .from('classes')
+        .select('*', { count: 'exact', head: true });
 
-        if (classesData && classesData.length > 0) {
-          const formattedClasses = classesData.map((c: any) => ({
-            id: c.classes.id,
-            class_name: c.classes.class_name,
-          }));
-          
-          setClasses(formattedClasses);
-          setSelectedClass(formattedClasses[0].id);
+      // Fetch assessments count
+      const { count: assessmentsCount } = await supabase
+        .from('assessments')
+        .select('*', { count: 'exact', head: true });
 
-          // Get students for the first class
-          const { data: studentsData } = await supabase
-            .from('students')
-            .select('id, first_name, last_name')
-            .eq('class_id', formattedClasses[0].id);
+      // Fetch today's attendance
+      const today = new Date().toISOString().split('T')[0];
+      const { count: attendanceCount } = await supabase
+        .from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('date', today);
 
-          if (studentsData) {
-            setStudents(studentsData);
-            setStats(prev => ({ ...prev, totalStudents: studentsData.length }));
-          }
+      setStats({
+        totalStudents: studentsCount || 0,
+        totalClasses: classesCount || 0,
+        pendingAssessments: assessmentsCount || 0,
+        todayAttendance: attendanceCount || 0,
+      });
 
-          setStats(prev => ({ ...prev, totalClasses: formattedClasses.length }));
-        }
+      // Fetch recent students
+      const { data: studentsData } = await supabase
+        .from('students')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          classes(class_name)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (studentsData) {
+        setRecentStudents(studentsData);
       }
 
-      setLoading(false);
     } catch (error) {
-      console.error('Error fetching teacher data:', error);
+      console.error('Error fetching dashboard data:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
       setLoading(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
+      <TeacherLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold tracking-tight">Teacher Dashboard</h1>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Loading...</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">---</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </TeacherLayout>
     );
   }
 
   return (
-    <TeacherLayout title="Dashboard">
+    <TeacherLayout>
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium">
-                Total Students
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalStudents}</div>
-              <p className="text-xs text-muted-foreground">
-                In all your classes
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium">Classes</CardTitle>
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalClasses}</div>
-              <p className="text-xs text-muted-foreground">
-                Classes you are teaching
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium">Attendance</CardTitle>
-              <AlertCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.attendanceRate}%</div>
-              <p className="text-xs text-muted-foreground">
-                Average attendance rate
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium">
-                Upcoming Tests
-              </CardTitle>
-              <Award className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.upcomingTests}</div>
-              <p className="text-xs text-muted-foreground">
-                Tests in the next week
-              </p>
-            </CardContent>
-          </Card>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold tracking-tight">Teacher Dashboard</h1>
+          <Badge variant="outline">Teacher</Badge>
         </div>
 
-        <Tabs defaultValue="classes" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
-            <TabsTrigger value="classes">Classes</TabsTrigger>
-            <TabsTrigger value="calendar">Calendar</TabsTrigger>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="attendance">Attendance</TabsTrigger>
+            <TabsTrigger value="assessments">Assessments</TabsTrigger>
+            <TabsTrigger value="announcements">Announcements</TabsTrigger>
           </TabsList>
-          <TabsContent value="classes">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Your Classes</h2>
-                <div className="space-y-2">
-                  {classes.map(cls => (
-                    <Card key={cls.id}>
-                      <CardHeader>
-                        <CardTitle>{cls.class_name}</CardTitle>
-                        <CardDescription>
-                          {students.length} Students
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="list-disc pl-4">
-                          {students.map(student => (
-                            <li key={student.id}>
-                              {student.first_name} {student.last_name}
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Actions</h2>
-                <Button>Add Announcement</Button>
-              </div>
-            </div>
-          </TabsContent>
-          <TabsContent value="calendar">
-            <div>
-              <h2 className="text-xl font-semibold mb-4">Calendar</h2>
+
+          <TabsContent value="overview" className="space-y-6">
+            {/* Stats Grid */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
-                <CardContent className="grid gap-4">
-                  <Calendar />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">My Students</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.totalStudents}</div>
+                  <p className="text-xs text-muted-foreground">Total students</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Classes</CardTitle>
+                  <BookOpen className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.totalClasses}</div>
+                  <p className="text-xs text-muted-foreground">Active classes</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Assessments</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.pendingAssessments}</div>
+                  <p className="text-xs text-muted-foreground">Total assessments</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Today's Attendance</CardTitle>
+                  <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.todayAttendance}</div>
+                  <p className="text-xs text-muted-foreground">Students marked</p>
                 </CardContent>
               </Card>
             </div>
+
+            {/* Recent Students */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Students</CardTitle>
+                <CardDescription>Latest student enrollments in your classes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {recentStudents.length > 0 ? (
+                    recentStudents.map((student) => (
+                      <div key={student.id} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">
+                              {student.first_name} {student.last_name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {student.classes?.class_name || 'No Class'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No recent students</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="attendance">
+            <AttendanceInterface />
+          </TabsContent>
+
+          <TabsContent value="assessments">
+            <AssessmentManager />
+          </TabsContent>
+
+          <TabsContent value="announcements">
+            <AnnouncementCreator />
           </TabsContent>
         </Tabs>
       </div>
     </TeacherLayout>
   );
-};
-
-export default TeacherDashboard;
+}
