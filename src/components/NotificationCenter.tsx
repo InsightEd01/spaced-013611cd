@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Bell, BellOff, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 
@@ -24,93 +23,63 @@ export default function NotificationCenter() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    fetchNotifications();
-    setupRealtimeSubscription();
+    // Mock notifications data for now - will be replaced with real data after database is properly set up
+    const mockNotifications: Notification[] = [
+      {
+        id: '1',
+        title: 'Welcome to the System',
+        message: 'Your account has been successfully created!',
+        type: 'success',
+        read: false,
+        created_at: new Date().toISOString(),
+        user_id: 'mock-user-1'
+      },
+      {
+        id: '2',
+        title: 'New Assessment Available',
+        message: 'Math Quiz 1 is now available for your students.',
+        type: 'info',
+        read: false,
+        created_at: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+        user_id: 'mock-user-1'
+      },
+      {
+        id: '3',
+        title: 'Attendance Reminder',
+        message: 'Please remember to mark attendance for today.',
+        type: 'warning',
+        read: true,
+        created_at: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+        user_id: 'mock-user-1'
+      },
+      {
+        id: '4',
+        title: 'System Maintenance',
+        message: 'The system will be under maintenance tonight from 11 PM to 2 AM.',
+        type: 'info',
+        read: true,
+        created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+        user_id: 'mock-user-1'
+      }
+    ];
+
+    setNotifications(mockNotifications);
+    setUnreadCount(mockNotifications.filter(n => !n.read).length);
+    setLoading(false);
   }, []);
 
-  const fetchNotifications = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-
-      setNotifications(data || []);
-      setUnreadCount(data?.filter(n => !n.read).length || 0);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-      toast.error('Failed to load notifications');
-    } finally {
-      setLoading(false);
-    }
+  const markAsRead = (notificationId: string) => {
+    setNotifications(prev =>
+      prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+    );
+    setUnreadCount(prev => Math.max(0, prev - 1));
+    toast.success('Notification marked as read');
   };
 
-  const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel('notifications-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications'
-        },
-        (payload) => {
-          const newNotification = payload.new as Notification;
-          setNotifications(prev => [newNotification, ...prev]);
-          setUnreadCount(prev => prev + 1);
-          
-          // Show toast for new notification
-          toast.info(newNotification.title, {
-            description: newNotification.message,
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
-  const markAsRead = async (notificationId: string) => {
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('id', notificationId);
-
-      if (error) throw error;
-
-      setNotifications(prev =>
-        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-      toast.error('Failed to mark notification as read');
-    }
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('read', false);
-
-      if (error) throw error;
-
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      setUnreadCount(0);
-      toast.success('All notifications marked as read');
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-      toast.error('Failed to mark all notifications as read');
-    }
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setUnreadCount(0);
+    toast.success('All notifications marked as read');
   };
 
   const getNotificationIcon = (type: string) => {

@@ -9,6 +9,8 @@ import Login from '@/pages/Login';
 import ParentSignup from '@/pages/ParentSignup';
 import NotFound from '@/pages/NotFound';
 import Index from '@/pages/Index';
+import SchoolAdminLogin from '@/pages/SchoolAdminLogin';
+import TeacherLogin from '@/pages/TeacherLogin';
 
 // Admin Pages
 import SupaAdminDashboard from '@/pages/admin/SupaAdminDashboard';
@@ -35,6 +37,8 @@ function App() {
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<ParentSignup />} />
+          <Route path="/school/login" element={<SchoolAdminLogin />} />
+          <Route path="/teacher/login" element={<TeacherLogin />} />
           
           {/* Protected Routes - Supa Admin */}
           <Route
