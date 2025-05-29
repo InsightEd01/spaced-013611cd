@@ -1,15 +1,10 @@
 
-import { createClient } from '@supabase/supabase-js';
-import { Database } from '@/types/database';
-
-// We're using the values directly from the integrations folder instead of environment variables
-const supabaseUrl = "https://ssrhvkewfijkyylgffzs.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzcmh2a2V3Zmlqa3l5bGdmZnpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc1MDg5NDEsImV4cCI6MjA2MzA4NDk0MX0.Wute4ADWntAjh5usU3fbTzJ13LX1jxH2NeaSsx2sogY";
-
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// Redirecting to the main Supabase client
+export { supabase } from '@/integrations/supabase/client';
 
 // Get the user's role from their metadata
 export const getRole = async () => {
+  const { supabase } = await import('@/integrations/supabase/client');
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   
