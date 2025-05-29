@@ -13,6 +13,7 @@ import Index from '@/pages/Index';
 // Admin Pages
 import SupaAdminDashboard from '@/pages/admin/SupaAdminDashboard';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
+import EnhancedFeaturesPage from '@/pages/admin/EnhancedFeaturesPage';
 
 // Parent Pages
 import ParentDashboard from '@/pages/parent/ParentDashboard';
@@ -55,6 +56,7 @@ function App() {
               <ProtectedRoute allowedRoles={['school_admin']}>
                 <Routes>
                   <Route path="dashboard" element={<AdminDashboard />} />
+                  <Route path="enhanced-features" element={<EnhancedFeaturesPage />} />
                   {/* Add more school admin routes */}
                 </Routes>
               </ProtectedRoute>
