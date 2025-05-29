@@ -56,7 +56,13 @@ const ParentDashboard = () => {
       // Fetch student information
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
-        .select('id, first_name, last_name, class_name, class_id')
+        .select(`
+          id, 
+          first_name, 
+          last_name, 
+          class_id,
+          classes!inner(class_name)
+        `)
         .in('id', authState.studentIds || []);
 
       if (studentsError) {
@@ -64,10 +70,19 @@ const ParentDashboard = () => {
       }
 
       if (studentsData) {
-        setStudents(studentsData);
+        // Transform the data to match our interface
+        const transformedStudents = studentsData.map((student: any) => ({
+          id: student.id,
+          first_name: student.first_name,
+          last_name: student.last_name,
+          class_id: student.class_id,
+          class_name: student.classes?.class_name || 'Unknown Class'
+        }));
+
+        setStudents(transformedStudents);
 
         // Fetch subjects for the first student
-        if (studentsData.length > 0) {
+        if (transformedStudents.length > 0) {
           const { data: subjectsData, error: subjectsError } = await supabase
             .from('subjects')
             .select('id, subject_name')
@@ -87,11 +102,11 @@ const ParentDashboard = () => {
           }
 
           // Fetch announcements for the student's class
-          if (studentsData[0].class_id) {
+          if (transformedStudents[0].class_id) {
             const { data: announcementsData, error: announcementsError } = await supabase
               .from('announcements')
               .select('id, title, content, date')
-              .eq('class_id', studentsData[0].class_id)
+              .eq('class_id', transformedStudents[0].class_id)
               .order('date', { ascending: false });
 
             if (announcementsError) {

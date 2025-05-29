@@ -48,10 +48,16 @@ const ParentAnnouncements = () => {
 
   const fetchStudentsAndAnnouncements = async () => {
     try {
-      // Fetch students first
+      // Fetch students first - using correct column names
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
-        .select('id, first_name, last_name, class_id, class_name')
+        .select(`
+          id, 
+          first_name, 
+          last_name, 
+          class_id,
+          classes!inner(class_name)
+        `)
         .in('id', authState.studentIds || []);
 
       if (studentsError) throw studentsError;
@@ -61,12 +67,21 @@ const ParentAnnouncements = () => {
         return;
       }
 
-      setStudents(studentsData);
+      // Transform the data to match our interface
+      const transformedStudents = studentsData.map((student: any) => ({
+        id: student.id,
+        first_name: student.first_name,
+        last_name: student.last_name,
+        class_id: student.class_id,
+        class_name: student.classes?.class_name || 'Unknown Class'
+      }));
+
+      setStudents(transformedStudents);
 
       // Fetch announcements for each student's class
       const announcementsMap: Record<string, Announcement[]> = {};
 
-      for (const student of studentsData) {
+      for (const student of transformedStudents) {
         if (student.class_id) {
           const { data: announcementsData, error: announcementsError } = await supabase
             .from('announcements')

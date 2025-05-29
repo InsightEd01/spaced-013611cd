@@ -1,3 +1,4 @@
+
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -31,6 +32,7 @@ import * as z from 'zod';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 const schoolFormSchema = z.object({
   name: z.string().min(2, 'School name must be at least 2 characters'),
@@ -62,15 +64,17 @@ export function AddSchoolDialog({ onSchoolAdded }: SchoolDialogProps) {
     try {
       const { error } = await supabase
         .from('schools')
-        .insert([data]);
+        .insert(data);
 
       if (error) throw error;
 
       form.reset();
       setOpen(false);
       if (onSchoolAdded) onSchoolAdded();
+      toast.success('School added successfully');
     } catch (error) {
       console.error('Error adding school:', error);
+      toast.error('Failed to add school');
     } finally {
       setLoading(false);
     }

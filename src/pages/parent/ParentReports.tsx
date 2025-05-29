@@ -41,7 +41,7 @@ interface Subject {
   subject_name: string;
   assessments: Assessment[];
   averageScore: number;
-  progress: number; // Adding progress property to the Subject interface
+  progress: number;
 }
 
 interface ChartDataPoint {
@@ -164,12 +164,15 @@ const ParentReports = () => {
         });
         
         const averageScore = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
+        
+        // Get progress from student_subjects
+        const progressData = subjectData.find(s => s.subject_id === subject.id);
 
         return {
           id: subject.id,
           subject_name: subject.subject_name,
           assessments: subjectAssessments,
-          progress: subjectData.find(s => s.subject_id === subject.id)?.progress || 0,
+          progress: progressData?.progress || 0,
           averageScore: averageScore
         };
       }) || [];

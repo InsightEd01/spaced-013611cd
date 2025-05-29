@@ -100,7 +100,13 @@ const ParentAttendance = () => {
 
       if (error) throw error;
 
-      setAttendanceRecords(data || []);
+      // Type assertion to ensure status matches our type
+      const typedData: AttendanceRecord[] = (data || []).map(record => ({
+        ...record,
+        status: record.status as 'present' | 'absent' | 'late'
+      }));
+
+      setAttendanceRecords(typedData);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching attendance records:', error);
